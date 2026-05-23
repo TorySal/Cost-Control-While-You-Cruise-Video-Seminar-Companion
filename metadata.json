@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Cost Control Video Seminar                                                                                                                                                               c        o                 m            p      a                                                                                                                                                                              ",
+  "description": "Video seminar companion app featuring Lin Pardey\u0027s cruising wisdom with a voice-enabled Bosun AI guide.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": []
+}
