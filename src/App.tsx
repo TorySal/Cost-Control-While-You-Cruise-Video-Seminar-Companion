@@ -26,7 +26,8 @@ import {
   Settings2,
   FileText,
   MoreVertical,
-  Maximize
+  Maximize,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
@@ -640,6 +641,52 @@ export default function App() {
     return [];
   };
 
+  const handleExportTranscript = (targetChapterIdx?: number) => {
+    let chIdx = targetChapterIdx;
+    if (chIdx === undefined) {
+      chIdx = 0;
+      for (let i = 0; i < CHAPTERS.length; i++) {
+        if (currentTime >= CHAPTERS[i].time) {
+          chIdx = i;
+        } else {
+          break;
+        }
+      }
+    }
+
+    const chapter = CHAPTERS[chIdx];
+    if (!chapter) return;
+
+    const segments = getSegmentsForChapter(chIdx);
+    
+    let outputText = `COST CONTROL WHILE YOU CRUISE - VIDEO SEMINAR BY LIN PARDEY\n`;
+    outputText += `CHAPTER ${chIdx + 1}: ${chapter.title.toUpperCase()}\n`;
+    outputText += `========================================================\n\n`;
+
+    if (segments.length === 0) {
+      outputText += `(No transcript available for this chapter)\n`;
+    } else {
+      segments.forEach((seg) => {
+        const timeStr = `[${formatTime(seg.startTime)} - ${formatTime(seg.endTime)}]`;
+        outputText += `${timeStr} ${seg.text}\n\n`;
+      });
+    }
+
+    const blob = new Blob([outputText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    
+    const cleanTitle = chapter.title.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    link.download = `chapter_${chIdx + 1}_${cleanTitle}_transcript.txt`;
+    link.href = url;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const getActiveSegment = (): TranscriptSegment | null => {
     if (!videoSrc || !showCaptions) return null;
     return srtSegments.find(seg => currentTime >= seg.startTime && currentTime < seg.endTime) || null;
@@ -783,6 +830,85 @@ export default function App() {
       videoRef.current.volume = volume;
     }
   }, [volume, videoSrc]);
+
+  // --- KEYBOARD SHORTCUTS FOR VIDEO CONTROLS ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if focus is on any input or editable field
+      const activeEl = document.activeElement;
+      if (activeEl) {
+        const tag = activeEl.tagName.toLowerCase();
+        if (
+          tag === 'input' || 
+          tag === 'textarea' || 
+          activeEl.hasAttribute('contenteditable') ||
+          (activeEl as any).isContentEditable
+        ) {
+          return;
+        }
+      }
+
+      if (!videoRef.current || !videoSrc) return;
+
+      const video = videoRef.current;
+      const key = e.key.toLowerCase();
+
+      switch (key) {
+        case ' ': // Space plays/pauses
+          e.preventDefault();
+          if (video.paused) {
+            video.play().catch(err => console.error(err));
+            setShowChapterOverlay(false);
+          } else {
+            video.pause();
+          }
+          break;
+
+        case 'arrowleft': // Seek backward (5s)
+          e.preventDefault();
+          video.currentTime = Math.max(0, video.currentTime - 5);
+          break;
+
+        case 'arrowright': // Seek forward (5s)
+          e.preventDefault();
+          video.currentTime = Math.min(video.duration || 0, video.currentTime + 5);
+          break;
+
+        case 'arrowup': // Volume up (5%)
+          e.preventDefault();
+          setVolume(prev => Math.min(1, Math.round((prev + 0.05) * 100) / 100));
+          break;
+
+        case 'arrowdown': // Volume down (5%)
+          e.preventDefault();
+          setVolume(prev => Math.max(0, Math.round((prev - 0.05) * 100) / 100));
+          break;
+
+        case 'm': // Toggle mute
+          e.preventDefault();
+          setVolume(prev => (prev === 0 ? 0.8 : 0));
+          break;
+
+        case 'f': // Toggle fullscreen
+          e.preventDefault();
+          handleFullScreen();
+          break;
+
+        case 'c': // Toggle closed captions
+          e.preventDefault();
+          setShowCaptions(prev => !prev);
+          break;
+
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [videoSrc]);
 
   // Handle auto-scrolling of active transcript segments
   useEffect(() => {
@@ -1690,6 +1816,40 @@ export default function App() {
                           <Settings2 size={12} className="text-gray-400" />
                           <span>Change Video file</span>
                         </button>
+
+                        {/* Keyboard Shortcuts Visual Guide */}
+                        <div className="border-t border-white/5 pt-2.5 space-y-1.5 select-none text-left">
+                          <div className="text-[9px] font-bold text-[#f5c96b] uppercase tracking-widest flex items-center justify-between px-1">
+                            <span>Video Shortcuts</span>
+                            <span className="text-gray-500 text-[8px] font-mono font-bold">ACTIVE</span>
+                          </div>
+                          <div className="grid grid-cols-1 gap-1 text-[10px] text-gray-300 font-sans px-1">
+                            <div className="flex items-center justify-between text-gray-400">
+                              <span>Play / Pause</span>
+                              <kbd className="font-mono text-[9px] bg-white/10 px-1 py-0.2 rounded text-white font-bold border border-white/5 shadow-sm">Space</kbd>
+                            </div>
+                            <div className="flex items-center justify-between text-gray-400">
+                              <span>Seek Backward / Forward</span>
+                              <kbd className="font-mono text-[9px] bg-white/10 px-1 py-0.2 rounded text-white font-bold border border-white/5 shadow-sm">← / →</kbd>
+                            </div>
+                            <div className="flex items-center justify-between text-gray-400">
+                              <span>Volume Up / Down</span>
+                              <kbd className="font-mono text-[9px] bg-white/10 px-1 py-0.2 rounded text-white font-bold border border-white/5 shadow-sm">↑ / ↓</kbd>
+                            </div>
+                            <div className="flex items-center justify-between text-gray-400">
+                              <span>Toggle Mute</span>
+                              <kbd className="font-mono text-[9px] bg-white/10 px-1.5 py-0.2 rounded text-white font-bold border border-white/5 shadow-sm">M</kbd>
+                            </div>
+                            <div className="flex items-center justify-between text-gray-400">
+                              <span>Toggle Fullscreen</span>
+                              <kbd className="font-mono text-[9px] bg-white/10 px-1.5 py-0.2 rounded text-white font-bold border border-white/5 shadow-sm">F</kbd>
+                            </div>
+                            <div className="flex items-center justify-between text-gray-400">
+                              <span>Toggle Captions (CC)</span>
+                              <kbd className="font-mono text-[9px] bg-white/10 px-1.5 py-0.2 rounded text-white font-bold border border-white/5 shadow-sm">C</kbd>
+                            </div>
+                          </div>
+                        </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -1742,6 +1902,16 @@ export default function App() {
                         >
                           <span className={`w-1 h-1 rounded-full ${autoScrollTranscript ? 'bg-[#f5c96b] animate-pulse' : 'bg-gray-600'}`}></span>
                           <span>Auto Scroll</span>
+                        </button>
+
+                        {/* Export Button */}
+                        <button 
+                          onClick={() => handleExportTranscript()}
+                          className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border bg-white/5 border-white/10 text-gray-400 hover:text-[#f5c96b] hover:border-[#f5c96b]/30 hover:bg-[#f5c96b]/10 transition-all cursor-pointer"
+                          title="Export Current Chapter Transcript as .txt"
+                        >
+                          <Download size={10} />
+                          <span>Export</span>
                         </button>
 
                         <button 
