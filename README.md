@@ -1,20 +1,19 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Cost Control Video Seminar — Bosun AI Co-Pilot
 
-# Run and deploy your AI Studio app
+An interactive learning platform designed around Lin Pardey's masterclass video seminar, **"Cost Control While You Cruise"**.
 
-This contains everything you need to run your app locally.
+---
 
-View your app in AI Studio: https://ai.studio/apps/26aba8c8-4208-462a-a695-5dcffbf8e70f
+## ⚓ Document Directory
 
-## Run Locally
+For the complete technical summary, features breakdown, and usage specifications, please consult:
+*   [**Full Seminar Documentation (Plain Text)**](./README.txt) — Comprehensive overview of the application components and operational tips.
 
-**Prerequisites:**  Node.js
+---
 
+## 🛠️ Key Highlights
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+*   **Intelligent Global Search**: Multi-source matching across Notes, Chat logs, and full Video Transcript, with smart synonym mapping and easy seek-to-time anchors.
+*   **Synced Transcript Interaction**: Interactive scrolling sidebar linked directly to video frames, featuring a one-click local text export of the active chapter's transcript.
+*   **Keyboard Shortcuts Layout**: Quick-key support permitting seamless desktop controls (`Space`, `Arrows`, `M`, `F`, `C`) for fluid lecture-taking.
+*   **The Bosun AI Voice Companion**: Real-time microphone audio feedback loop linked to the Gemini API for natural voice inquiries on sea-faring costs, provisioning, and seamanship.

@@ -13,6 +13,8 @@ import {
   Pause, 
   ChevronDown, 
   ChevronUp, 
+  ChevronLeft,
+  ChevronRight,
   Send, 
   RotateCcw, 
   Anchor, 
@@ -602,6 +604,10 @@ export default function App() {
   const [notesSearch, setNotesSearch] = useState('');
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [searchResultFilter, setSearchResultFilter] = useState<'all' | 'notes' | 'chat' | 'transcript'>('all');
+  const [isReadAloudActive, setIsReadAloudActive] = useState(false);
+  const [isReadAloudPaused, setIsReadAloudPaused] = useState(false);
+  const [readAloudEntries, setReadAloudEntries] = useState<string[]>([]);
+  const [currentReadAloudIndex, setCurrentReadAloudIndex] = useState(0);
   const [isLoadingPersistedVideo, setIsLoadingPersistedVideo] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [showCaptions, setShowCaptions] = useState(false);
@@ -830,6 +836,143 @@ export default function App() {
       videoRef.current.volume = volume;
     }
   }, [volume, videoSrc]);
+
+  // --- SEARCH READ ALOUD CONTROLS ---
+  const speakSearchEntry = (index: number, entriesList: string[]) => {
+    if (!synthRef.current || entriesList.length === 0) return;
+    
+    // Cancel any active speech
+    synthRef.current.cancel();
+    
+    setCurrentReadAloudIndex(index);
+    setIsReadAloudActive(true);
+    setIsReadAloudPaused(false);
+    
+    const textToSpeak = entriesList[index];
+    if (!textToSpeak) return;
+
+    // Small delay to let synthesis engine reset cleanly
+    setTimeout(() => {
+      if (!synthRef.current) return;
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      
+      const voices = synthRef.current.getVoices();
+      const preferredVoice = voices.find(v => v.name.includes('Daniel')) || 
+                            voices.find(v => v.name === 'Alex') ||
+                            voices.find(v => v.name.includes('Google UK English Male')) ||
+                            voices.find(v => v.name.includes('Male') && v.lang.startsWith('en-GB')) ||
+                            voices.find(v => v.name.includes('Male') && v.lang.startsWith('en-US')) ||
+                            voices.find(v => v.name.includes('Guy')) ||
+                            voices.find(v => v.name.includes('Male')) ||
+                            voices[0];
+      
+      if (preferredVoice) utterance.voice = preferredVoice;
+      utterance.pitch = 0.6; // Deep, gravely "Old Salt" pitch
+      utterance.rate = 1.1;  // Balanced, steady pace
+
+      utterance.onstart = () => {
+        setIsReadAloudActive(true);
+        setIsReadAloudPaused(false);
+      };
+
+      utterance.onend = () => {
+        setIsReadAloudActive(false);
+        setIsReadAloudPaused(false);
+      };
+
+      utterance.onerror = (e) => {
+        console.error("Read Aloud Speech Error", e);
+        setIsReadAloudActive(false);
+        setIsReadAloudPaused(false);
+      };
+
+      synthRef.current.speak(utterance);
+    }, 60);
+  };
+
+  const startSearchReadAloud = (
+    matchedNotes: Array<{ text: string; idx: number }>,
+    matchedChat: any[],
+    matchedTranscript: any[]
+  ) => {
+    if (!synthRef.current) return;
+
+    const entriesList: string[] = [];
+
+    if (searchResultFilter === 'all' || searchResultFilter === 'notes') {
+      matchedNotes.forEach((item) => {
+        entriesList.push(`From Notes, line ${item.idx + 1}: ${item.text}`);
+      });
+    }
+
+    if (searchResultFilter === 'all' || searchResultFilter === 'chat') {
+      matchedChat.forEach((m) => {
+        const speaker = m.type === 'user' ? 'User' : 'Bosun Co-Pilot';
+        entriesList.push(`From Chat logs, ${speaker} said: ${m.text}`);
+      });
+    }
+
+    if (searchResultFilter === 'all' || searchResultFilter === 'transcript') {
+      matchedTranscript.forEach((seg) => {
+        entriesList.push(`From video transcript at ${formatTime(seg.startTime)}: ${seg.speaker || 'Instructor'} says ${seg.text}`);
+      });
+    }
+
+    if (entriesList.length === 0) return;
+
+    setReadAloudEntries(entriesList);
+    speakSearchEntry(0, entriesList);
+  };
+
+  const navigateSearchReadAloud = (dir: 'next' | 'back') => {
+    let nextIndex = currentReadAloudIndex;
+    if (dir === 'next') {
+      if (currentReadAloudIndex + 1 < readAloudEntries.length) {
+        nextIndex = currentReadAloudIndex + 1;
+      }
+    } else {
+      if (currentReadAloudIndex - 1 >= 0) {
+        nextIndex = currentReadAloudIndex - 1;
+      }
+    }
+    
+    if (nextIndex !== currentReadAloudIndex) {
+      speakSearchEntry(nextIndex, readAloudEntries);
+    }
+  };
+
+  const pauseSearchReadAloud = () => {
+    if (synthRef.current && isReadAloudActive) {
+      synthRef.current.pause();
+      setIsReadAloudPaused(true);
+    }
+  };
+
+  const resumeSearchReadAloud = () => {
+    if (synthRef.current && isReadAloudActive) {
+      synthRef.current.resume();
+      setIsReadAloudPaused(false);
+    }
+  };
+
+  const stopSearchReadAloud = () => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+    }
+    setIsReadAloudActive(false);
+    setIsReadAloudPaused(false);
+  };
+
+  // Auto-stop read aloud if query, filter, or tab transitions
+  useEffect(() => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+    }
+    setIsReadAloudActive(false);
+    setIsReadAloudPaused(false);
+    setReadAloudEntries([]);
+    setCurrentReadAloudIndex(0);
+  }, [globalSearchQuery, searchResultFilter, activeTab]);
 
   // --- KEYBOARD SHORTCUTS FOR VIDEO CONTROLS ---
   useEffect(() => {
@@ -2582,113 +2725,239 @@ export default function App() {
               </div>
             )}
 
-            {activeTab === 'search' && (
-              <div className="p-6 space-y-6 flex flex-col min-h-[750px]">
-                {/* Search Input Area */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-[#1f2937] pb-2">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-[#f5c96b] flex items-center gap-2">
-                      <Search size={14} /> Global Search
-                    </h3>
-                    <span className="text-[10px] text-gray-500 font-mono font-bold tracking-wider">SEARCH ALL CHANNELS</span>
-                  </div>
-                  
-                  <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                    <input 
-                      type="text"
-                      value={globalSearchQuery}
-                      onChange={(e) => setGlobalSearchQuery(e.target.value)}
-                      placeholder="Search Chat, Notes, and Video Transcript..."
-                      className="w-full bg-black/40 border border-[#1f2937] pl-12 pr-4 py-3 placeholder-gray-500 text-sm focus:outline-none focus:border-[#f5c96b]/50 transition-all text-white rounded-2xl"
-                      autoFocus
-                    />
-                    {globalSearchQuery && (
-                      <button 
-                        onClick={() => setGlobalSearchQuery('')}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-semibold transition-colors cursor-pointer"
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
+            {activeTab === 'search' && (() => {
+              const matchedNotes = notes.split('\n')
+                .map((text, idx) => ({ text, idx }))
+                .filter(item => testSearchMatch(item.text, globalSearchQuery) && item.text.trim() !== '');
+                
+              const matchedChat = messages.filter(m => testSearchMatch(m.text, globalSearchQuery));
+              const matchedTranscript = srtSegments.filter(s => testSearchMatch(s.text, globalSearchQuery));
 
-                  {/* Filter Tabs / Chips */}
-                  <div className="flex items-center gap-2 pt-1 flex-wrap">
-                    <span className="text-[10px] text-gray-500 uppercase font-bold mr-1">Filter:</span>
-                    {(['all', 'notes', 'chat', 'transcript'] as const).map((filter) => {
-                      // Count number of matches to display inside badge
-                      let count = 0;
-                      if (globalSearchQuery.trim()) {
-                        if (filter === 'all' || filter === 'notes') {
-                          count += notes.split('\n').filter(line => testSearchMatch(line, globalSearchQuery) && line.trim() !== '').length;
-                        }
-                        if (filter === 'all' || filter === 'chat') {
-                          count += messages.filter(m => testSearchMatch(m.text, globalSearchQuery)).length;
-                        }
-                        if (filter === 'all' || filter === 'transcript') {
-                          count += srtSegments.filter(s => testSearchMatch(s.text, globalSearchQuery)).length;
-                        }
-                      }
-                      
-                      const label = filter === 'all' ? 'All Results' : filter.charAt(0).toUpperCase() + filter.slice(1);
-                      const isSelected = searchResultFilter === filter;
-                      
-                      return (
-                        <button
-                          key={filter}
-                          onClick={() => setSearchResultFilter(filter)}
-                          className={`px-3 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-full transition-all flex items-center gap-1.5 border cursor-pointer ${
-                            isSelected 
-                              ? 'bg-[#f5c96b]/25 border-[#f5c96b]/40 text-[#f5c96b]' 
-                              : 'bg-black/25 border-[#1f2937] text-gray-400 hover:text-gray-200'
-                          }`}
-                        >
-                          {label}
-                          {globalSearchQuery.trim() && (
-                            <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${
-                              isSelected ? 'bg-[#f5c96b]/20 text-[#f5c96b]' : 'bg-white/5 text-gray-500'
-                            }`}>
-                              {count}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+              const hasNotes = matchedNotes.length > 0;
+              const hasChat = matchedChat.length > 0;
+              const hasTranscript = matchedTranscript.length > 0;
+              const hasAnyMatches = globalSearchQuery.trim() && (hasNotes || hasChat || hasTranscript);
 
-                {/* Results Screen */}
-                <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar min-h-[450px]">
-                  {!globalSearchQuery.trim() ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-center text-gray-500">
-                      <Search className="text-gray-600 mb-3 opacity-30" size={32} />
-                      <p className="text-xs max-w-xs">Type a keyword or phrase above to query your active notes, the AI conversation log, and full seminar video transcripts.</p>
+              const isAll = searchResultFilter === 'all';
+
+              return (
+                <div className="p-6 space-y-6 flex flex-col min-h-[750px]">
+                  {/* Search Input Area */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-[#1f2937] pb-2">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-[#f5c96b] flex items-center gap-2">
+                        <Search size={14} /> Global Search
+                      </h3>
+                      <span className="text-[10px] text-gray-500 font-mono font-bold tracking-wider">SEARCH ALL CHANNELS</span>
                     </div>
-                  ) : (() => {
-                    const matchedNotes = notes.split('\n')
-                      .map((text, idx) => ({ text, idx }))
-                      .filter(item => testSearchMatch(item.text, globalSearchQuery) && item.text.trim() !== '');
-                      
-                    const matchedChat = messages.filter(m => testSearchMatch(m.text, globalSearchQuery));
-                    const matchedTranscript = srtSegments.filter(s => testSearchMatch(s.text, globalSearchQuery));
-
-                    const hasNotes = matchedNotes.length > 0;
-                    const hasChat = matchedChat.length > 0;
-                    const hasTranscript = matchedTranscript.length > 0;
                     
-                    const isAll = searchResultFilter === 'all';
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                      <input 
+                        type="text"
+                        value={globalSearchQuery}
+                        onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                        placeholder="Search Chat, Notes, and Video Transcript..."
+                        className="w-full bg-black/40 border border-[#1f2937] pl-12 pr-4 py-3 placeholder-gray-500 text-sm focus:outline-none focus:border-[#f5c96b]/50 transition-all text-white rounded-2xl"
+                        autoFocus
+                      />
+                      {globalSearchQuery && (
+                        <button 
+                          onClick={() => setGlobalSearchQuery('')}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
 
-                    if (!hasNotes && !hasChat && !hasTranscript) {
-                      return (
-                        <div className="text-center py-16 text-gray-500">
-                          <p className="text-xs">No matching results found across notes, chat, or transcript for <span className="text-white">"{globalSearchQuery}"</span>.</p>
-                          <p className="text-[10px] text-gray-600 mt-1">Try refining your search text or shifting keywords.</p>
+                    {/* Filter Tabs / Chips */}
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                      <span className="text-[10px] text-gray-500 uppercase font-bold mr-1">Filter:</span>
+                      {(['all', 'notes', 'chat', 'transcript'] as const).map((filter) => {
+                        // Count number of matches to display inside badge
+                        let count = 0;
+                        if (globalSearchQuery.trim()) {
+                          if (filter === 'all' || filter === 'notes') {
+                            count += matchedNotes.length;
+                          }
+                          if (filter === 'all' || filter === 'chat') {
+                            count += matchedChat.length;
+                          }
+                          if (filter === 'all' || filter === 'transcript') {
+                            count += matchedTranscript.length;
+                          }
+                        }
+                        
+                        const label = filter === 'all' ? 'All Results' : filter.charAt(0).toUpperCase() + filter.slice(1);
+                        const isSelected = searchResultFilter === filter;
+                        
+                        return (
+                          <button
+                            key={filter}
+                            onClick={() => setSearchResultFilter(filter)}
+                            className={`px-3 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-full transition-all flex items-center gap-1.5 border cursor-pointer ${
+                              isSelected 
+                                ? 'bg-[#f5c96b]/25 border-[#f5c96b]/40 text-[#f5c96b]' 
+                                : 'bg-black/25 border-[#1f2937] text-gray-400 hover:text-gray-200'
+                            }`}
+                          >
+                            {label}
+                            {globalSearchQuery.trim() && (
+                              <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${
+                                isSelected ? 'bg-[#f5c96b]/20 text-[#f5c96b]' : 'bg-white/5 text-gray-500'
+                              }`}>
+                                {count}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* READ ALOUD ASSISTANT BAR */}
+                  {hasAnyMatches && (
+                    <div className="bg-[#f5c96b]/5 border border-[#f5c96b]/10 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2.5 rounded-xl transition-all duration-300 ${isReadAloudActive && !isReadAloudPaused ? 'bg-[#f5c96b]/20 text-[#f5c96b] shadow-[0_0_15px_rgba(245,201,107,0.3)]' : 'bg-white/5 text-gray-400'}`}>
+                          <Volume2 size={16} />
                         </div>
-                      );
-                    }
+                        <div>
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                            Search Read Aloud
+                            {isReadAloudActive && !isReadAloudPaused && (
+                              <span className="text-[8px] bg-[#f5c96b]/20 text-[#f5c96b] px-1.5 py-0.2 rounded font-mono font-bold uppercase tracking-wider animate-pulse">
+                                Reading
+                              </span>
+                            )}
+                          </h4>
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {isReadAloudActive 
+                              ? (isReadAloudPaused ? 'Audio paused.' : `Synthesizing Old Sea dog voice for match ${currentReadAloudIndex + 1} of ${readAloudEntries.length}...`)
+                              : (readAloudEntries.length > 0
+                                  ? `Salty results prepared. Now viewing match ${currentReadAloudIndex + 1} of ${readAloudEntries.length}.`
+                                  : `Click to read aloud the matched search results (${searchResultFilter === 'all' ? 'All Matches' : `${searchResultFilter.toUpperCase()} Matches`}).`
+                                )
+                            }
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2.5 self-end sm:self-auto flex-wrap">
+                        {/* Voice waveform animation */}
+                        {isReadAloudActive && !isReadAloudPaused && (
+                          <div className="flex items-end gap-1 h-4 mr-2 bg-black/40 border border-white/5 px-2 py-1 rounded-lg">
+                            {[1, 2, 3, 4, 5].map((bar) => (
+                              <motion.div
+                                key={bar}
+                                className="w-0.5 bg-[#f5c96b] rounded-full"
+                                style={{ height: '4px' }}
+                                animate={{
+                                  height: ['4px', '14px', '4px'],
+                                }}
+                                transition={{
+                                  duration: 0.4 + bar * 0.08,
+                                  repeat: Infinity,
+                                  ease: "easeInOut",
+                                }}
+                              />
+                            ))}
+                          </div>
+                        )}
 
-                    return (
+                        {/* NEXT and BACK buttons if more than one result entry exists */}
+                        {readAloudEntries.length > 1 && (
+                          <div className="flex items-center gap-1 bg-black/40 border border-white/5 rounded-lg p-1 mr-1.5">
+                            <button
+                              onClick={() => navigateSearchReadAloud('back')}
+                              disabled={currentReadAloudIndex === 0}
+                              className={`p-1.5 rounded transition-all cursor-pointer ${
+                                currentReadAloudIndex === 0 
+                                  ? 'text-gray-600 cursor-not-allowed opacity-30' 
+                                  : 'text-[#f5c96b] hover:bg-white/5'
+                              }`}
+                              title="Previous Match"
+                            >
+                              <ChevronLeft size={14} />
+                            </button>
+                            <span className="text-[10px] font-mono font-bold text-gray-400 px-1.5 select-none min-w-[32px] text-center">
+                              {currentReadAloudIndex + 1}/{readAloudEntries.length}
+                            </span>
+                            <button
+                              onClick={() => navigateSearchReadAloud('next')}
+                              disabled={currentReadAloudIndex === readAloudEntries.length - 1}
+                              className={`p-1.5 rounded transition-all cursor-pointer ${
+                                currentReadAloudIndex === readAloudEntries.length - 1 
+                                  ? 'text-gray-600 cursor-not-allowed opacity-30' 
+                                  : 'text-[#f5c96b] hover:bg-white/5'
+                              }`}
+                              title="Next Match"
+                            >
+                              <ChevronRight size={14} />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Control buttons */}
+                        {!isReadAloudActive ? (
+                          <button
+                            onClick={() => {
+                              if (readAloudEntries.length > 0) {
+                                speakSearchEntry(currentReadAloudIndex, readAloudEntries);
+                              } else {
+                                startSearchReadAloud(matchedNotes, matchedChat, matchedTranscript);
+                              }
+                            }}
+                            className="px-3.5 py-1.5 bg-[#f5c96b] hover:bg-[#f5c96b]/90 text-slate-950 text-[10px] font-bold font-sans uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#f5c96b]/5"
+                          >
+                            <Play size={10} fill="currentColor" />
+                            <span>{readAloudEntries.length > 0 ? 'Speak Match' : 'Read Matches'}</span>
+                          </button>
+                        ) : (
+                          <>
+                            {isReadAloudPaused ? (
+                              <button
+                                onClick={resumeSearchReadAloud}
+                                className="px-2.5 py-1.5 bg-[#f5c96b]/15 border border-[#f5c96b]/30 text-[#f5c96b] text-[10px] font-bold uppercase rounded-lg hover:bg-[#f5c96b]/25 transition-all flex items-center gap-1 cursor-pointer"
+                                title="Resume"
+                              >
+                                <Play size={10} fill="currentColor" />
+                                <span>Resume</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={pauseSearchReadAloud}
+                                className="px-2.5 py-1.5 bg-white/5 border border-white/10 text-white text-[10px] font-bold uppercase rounded-lg hover:bg-white/10 transition-all flex items-center gap-1 cursor-pointer"
+                                title="Pause"
+                              >
+                                <Pause size={10} />
+                                <span>Pause</span>
+                              </button>
+                            )}
+
+                            <button
+                              onClick={stopSearchReadAloud}
+                              className="px-2.5 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-bold uppercase rounded-lg hover:bg-red-500/15 transition-all flex items-center gap-1 cursor-pointer"
+                              title="Stop"
+                            >
+                              <Square size={10} fill="currentColor" />
+                              <span>Stop</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Results Screen */}
+                  <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar min-h-[450px]">
+                    {!globalSearchQuery.trim() ? (
+                      <div className="flex flex-col items-center justify-center py-16 text-center text-gray-500">
+                        <Search className="text-gray-600 mb-3 opacity-30" size={32} />
+                        <p className="text-xs max-w-xs">Type a keyword or phrase above to query your active notes, the AI conversation log, and full seminar video transcripts.</p>
+                      </div>
+                    ) : (
                       <div className="space-y-8 pb-8">
                         {/* 1. NOTES SECTION */}
                         {(isAll || searchResultFilter === 'notes') && hasNotes && (
@@ -2701,6 +2970,7 @@ export default function App() {
                                 <button
                                   key={`note-${i}`}
                                   onClick={() => {
+                                    stopSearchReadAloud();
                                     setNotesSearch(globalSearchQuery);
                                     setActiveTab('notes');
                                   }}
@@ -2732,6 +3002,7 @@ export default function App() {
                                   <button
                                     key={`chat-${m.id || i}`}
                                     onClick={() => {
+                                      stopSearchReadAloud();
                                       setActiveTab('chat');
                                       setTimeout(() => {
                                         const elementId = `msg-${m.id}`;
@@ -2772,6 +3043,7 @@ export default function App() {
                                 <button
                                   key={`tr-${i}`}
                                   onClick={() => {
+                                    stopSearchReadAloud();
                                     if (videoRef.current) {
                                       // Scroll video player to view if needed
                                       videoRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2795,11 +3067,11 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                    );
-                  })()}
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
           
           {/* FOOTER - Moved inside main to be part of the main scrollable area */}

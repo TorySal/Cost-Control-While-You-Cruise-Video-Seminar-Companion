@@ -38,6 +38,27 @@ For a bit of entertainment between lessons:
 *   **Bosun Voice:** Toggle the "Voice" switch to have the Bosun speak his replies out loud. If you don't hear anything at first, toggle it **OFF and back ON** to "prime" the browser's audio engine.
 *   **Listening Mode:** Click the "Listening" microphone to speak your queries. The waveform at the bottom shows your voice activity. Note: Browsers require a user gesture (like this click) to enable audio.
 
+### 🔍 Global Search Tab
+*   **Location:** Access the **Search** tab next to Chat, Notes, and Logbook.
+*   **Intelligent Synonym Matching:** Features a robust synonym search engine. Searching for common phrases like *"sailing with other boats"* will successfully match and surface occurrences of related concepts like *"cruising in company"* and *"buddy boating"* across:
+    *   **Notes:** Any notes you've composed matching your term.
+    *   **Chat Logs:** Stored messages from your live AI session.
+    *   **Transcript segments:** Timecodes with instant seek-and-play links to go directly to that section in the video.
+*   **Filtering:** Filter results instantly by **All**, **Notes**, **Chat**, or **Transcript** with dynamic occurrence counters.
+
+### 📄 Transcript Export
+*   **Location:** Click the **Transcript** icon on the bottom video controller to toggle the full side panel.
+*   **Behavior:** Use the **Export** button inside the header of the transcript pane to instantly compile and download the current chapter's transcript text as a `.txt` file with formatted timestamps.
+
+### ⌨️ Video Keyboard Shortcuts
+Control playback smoothly from your desktop using these responsive keys (active when not focusing text fields):
+*   `Space` — Play / Pause the video
+*   `Left / Right Arrows` — Seek 5 seconds backward / forward
+*   `Up / Down Arrows` — Smooth volume adjustments (5% per tick)
+*   `M` — Toggle Mute / Unmute
+*   `F` — Toggle Fullscreen mode
+*   `C` — Toggle Closed Captions (CC) on or off
+
 ### Manual Navigation
 *   **Sidebar:** Open the sidebar (top-left) to see the full list of chapters.
 *   **Progress Tracking:** As the video plays, watch the chapter list highlight your current position.
