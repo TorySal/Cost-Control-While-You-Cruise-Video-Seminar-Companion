@@ -1564,7 +1564,7 @@ export default function App() {
             <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap">
               <p className="text-[9px] md:text-xs text-gray-400 font-medium">Lin Pardey • Sailflix Originals</p>
               <span className="text-gray-600 text-[10px] hidden md:inline">•</span>
-              <p className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-gray-300">Video Seminar Companion</p>
+              <p className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-gray-300">Video Seminar AI Compaion</p>
             </div>
           </div>
         </div>
