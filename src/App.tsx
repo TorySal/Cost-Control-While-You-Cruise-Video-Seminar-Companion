@@ -1112,7 +1112,9 @@ export default function App() {
       recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
         setInputText(transcript);
-        handleSend(transcript);
+        if (handleSendRef.current) {
+          handleSendRef.current(transcript);
+        }
         setIsListening(false);
       };
 
@@ -1166,6 +1168,9 @@ export default function App() {
       recognitionRef.current?.stop();
       setIsListening(false);
     } else {
+      // Clear any current background speech to avoid recording feedback
+      stopAllBosunSpeech();
+      
       // Prime the speech synth on user gesture
       if (isBosunVoiceEnabled && synthRef.current) {
         const prime = new SpeechSynthesisUtterance("");
@@ -1253,6 +1258,8 @@ export default function App() {
   }, [isSpeaking, isPaused, speakingMessageId, speak]);
 
   // --- CHAT LOGIC ---
+  const handleSendRef = useRef<(text?: string) => void>(() => {});
+  
   const handleSend = (text: string = inputText) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -1280,6 +1287,10 @@ export default function App() {
       bosunRespond(trimmed);
     }, 500);
   };
+
+  useEffect(() => {
+    handleSendRef.current = handleSend;
+  }, [handleSend]);
 
   const bosunRespond = async (text: string) => {
     setIsTyping(true);
