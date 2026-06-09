@@ -2443,26 +2443,71 @@ export default function App() {
                           </div>
                           
                           {m.type === 'bosun' && (
-                            <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/5">
-                              <button 
-                                onClick={() => handleSpeechAction(m.text, m.id)}
-                                className={`p-1 px-2 rounded-md transition-all flex items-center gap-1.5 ${
-                                  speakingMessageId === m.id 
-                                    ? "bg-[#f5c96b]/25 text-[#f5c96b] ring-1 ring-[#f5c96b]/40 shadow-[0_0_8px_rgba(245,201,107,0.25)]" 
-                                    : "bg-white/5 text-gray-500 hover:text-[#f5c96b] hover:bg-white/10"
-                                }`}
-                                title={speakingMessageId === m.id && isPaused ? "Resume Reading" : speakingMessageId === m.id && isSpeaking ? "Pause Reading" : "Read Aloud"}
-                              >
-                                {speakingMessageId === m.id && isPaused ? <Play size={10} fill="currentColor" /> : speakingMessageId === m.id && isSpeaking ? <Pause size={10} fill="currentColor" /> : <Volume2 size={10} />}
-                                <span className="text-[9px] font-bold uppercase tracking-tighter">
-                                  {speakingMessageId === m.id && isPaused ? "Resume" : speakingMessageId === m.id && isSpeaking ? "Pause" : "Listen"}
-                                </span>
-                                <InlineEqualizer isSpeaking={speakingMessageId === m.id && isSpeaking} isPaused={isPaused} size="sm" />
-                              </button>
+                            <div className="flex items-center gap-2.5 mt-3 pt-3 border-t border-white/5 flex-wrap">
+                              {/* PAUSE / RESUME / PLAY (Listen) Controls */}
+                              {speakingMessageId !== m.id ? (
+                                <button 
+                                  onClick={() => speak(m.text, m.id)}
+                                  className="px-2.5 py-1 bg-[#f5c96b] hover:bg-[#f5c96b]/90 text-slate-950 text-[10px] font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#f5c96b]/5"
+                                  title="Read Aloud"
+                                >
+                                  <Play size={10} fill="currentColor" />
+                                  <span>Read Aloud</span>
+                                </button>
+                              ) : (
+                                <>
+                                  {isPaused ? (
+                                    <button 
+                                      onClick={() => {
+                                        if (synthRef.current) {
+                                          synthRef.current.resume();
+                                          setIsPaused(false);
+                                        }
+                                      }}
+                                      className="px-2.5 py-1 bg-[#f5c96b]/15 border border-[#f5c96b]/30 text-[#f5c96b] text-[10px] font-bold uppercase rounded-lg hover:bg-[#f5c96b]/25 transition-all flex items-center gap-1 cursor-pointer"
+                                      title="Resume"
+                                    >
+                                      <Play size={10} fill="currentColor" />
+                                      <span>Resume</span>
+                                    </button>
+                                  ) : (
+                                    <button 
+                                      onClick={() => {
+                                        if (synthRef.current) {
+                                          synthRef.current.pause();
+                                          setIsPaused(true);
+                                        }
+                                      }}
+                                      className="px-2.5 py-1 bg-white/5 border border-white/10 text-white text-[10px] font-bold uppercase rounded-lg hover:bg-white/10 transition-all flex items-center gap-1 cursor-pointer"
+                                      title="Pause"
+                                    >
+                                      <Pause size={10} />
+                                      <span>Pause</span>
+                                    </button>
+                                  )}
 
+                                  <button 
+                                    onClick={() => {
+                                      synthRef.current?.cancel();
+                                      setIsSpeaking(false);
+                                      setIsPaused(false);
+                                      setSpeakingMessageId(null);
+                                    }}
+                                    className="px-2.5 py-1 bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-bold uppercase rounded-lg hover:bg-red-500/15 transition-all flex items-center gap-1 cursor-pointer"
+                                    title="Stop"
+                                  >
+                                    <Square size={10} fill="currentColor" />
+                                    <span>Stop</span>
+                                  </button>
+                                </>
+                              )}
+
+                              {/* Voice waveform animation */}
                               {speakingMessageId === m.id && isSpeaking && (
-                                <div className="flex items-center gap-1.5 px-2 bg-[#f5c96b]/10 border border-[#f5c96b]/20 rounded-lg py-1 h-6">
-                                  <span className="text-[8px] font-bold text-[#f5c96b] uppercase tracking-wider animate-pulse">Speaking</span>
+                                <div className="flex items-center gap-1.5 px-2 bg-black/40 border border-white/5 rounded-lg py-1 h-6">
+                                  <span className="text-[8px] font-bold text-[#f5c96b] uppercase tracking-wider animate-pulse">
+                                    {isPaused ? 'Paused' : 'Speaking'}
+                                  </span>
                                   <div className="flex items-end gap-0.5 h-3">
                                     {[1, 2, 3, 4, 5].map((val) => (
                                       <motion.div 
@@ -2480,22 +2525,6 @@ export default function App() {
                                     ))}
                                   </div>
                                 </div>
-                              )}
-
-                              {speakingMessageId === m.id && (isSpeaking || isPaused) && (
-                                <button 
-                                  onClick={() => {
-                                    synthRef.current?.cancel();
-                                    setIsSpeaking(false);
-                                    setIsPaused(false);
-                                    setSpeakingMessageId(null);
-                                  }}
-                                  className="p-1 px-2 bg-white/5 text-gray-500 rounded-md hover:text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-1"
-                                  title="Stop Speaking"
-                                >
-                                  <Square size={8} fill="currentColor" />
-                                  <span className="text-[8px] font-bold uppercase">Stop</span>
-                                </button>
                               )}
                             </div>
                           )}
