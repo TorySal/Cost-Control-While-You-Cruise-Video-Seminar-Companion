@@ -3091,11 +3091,15 @@ export default function App() {
                                 <button
                                   key={`tr-${i}`}
                                   onClick={() => {
-                                    stopSearchReadAloud();
+                                    stopAllBosunSpeech();
                                     if (videoRef.current) {
                                       // Scroll video player to view if needed
                                       videoRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                      videoRef.current.pause();
                                       videoRef.current.currentTime = seg.startTime;
+                                      setCurrentTime(seg.startTime);
+                                      setIsPlaying(true);
+                                      setShowChapterOverlay(false);
                                       videoRef.current.play().catch(e => console.error(e));
                                     }
                                   }}
