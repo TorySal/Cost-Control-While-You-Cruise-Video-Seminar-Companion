@@ -955,6 +955,17 @@ export default function App() {
     }
   };
 
+  const stopAllBosunSpeech = useCallback(() => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+    }
+    setIsSpeaking(false);
+    setIsPaused(false);
+    setSpeakingMessageId(null);
+    setIsReadAloudActive(false);
+    setIsReadAloudPaused(false);
+  }, []);
+
   const stopSearchReadAloud = () => {
     if (synthRef.current) {
       synthRef.current.cancel();
@@ -962,6 +973,13 @@ export default function App() {
     setIsReadAloudActive(false);
     setIsReadAloudPaused(false);
   };
+
+  // Automatically stop all Bosun voice playback when the video starts playing
+  useEffect(() => {
+    if (isPlaying) {
+      stopAllBosunSpeech();
+    }
+  }, [isPlaying, stopAllBosunSpeech]);
 
   // Auto-stop read aloud if query, filter, or tab transitions
   useEffect(() => {
@@ -1812,6 +1830,7 @@ export default function App() {
                 onPlay={() => {
                   setIsPlaying(true);
                   setShowChapterOverlay(false);
+                  stopAllBosunSpeech();
                 }}
                 onPause={() => setIsPlaying(false)}
               />
