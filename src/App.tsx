@@ -631,6 +631,14 @@ export default function App() {
   const synthRef = useRef<SpeechSynthesis|null>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto scroll chat to bottom when messages or typing state changes
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isTyping]);
 
   // --- CAPTIONS & TRANSCRIPT GENERATION HELPERS ---
   const getSegmentsForChapter = (chapterIdx: number): DisplaySegment[] => {
@@ -2377,8 +2385,8 @@ export default function App() {
           {/* TAB PANELS */}
           <div className="flex-1 min-h-[750px] bg-black/20">
             {activeTab === 'chat' && (
-              <div className="flex flex-col">
-                <div className="p-4 space-y-6">
+              <div className="flex flex-col h-[650px] md:h-[700px]">
+                <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
                   {messages.map((m) => (
                     <motion.div 
                       key={m.id} 
@@ -2569,6 +2577,7 @@ export default function App() {
                       </div>
                     </div>
                   )}
+                  <div ref={chatEndRef} />
                 </div>
 
                 <div className="p-4 bg-[#050d1a] border-t border-[#1f2937] space-y-3">
